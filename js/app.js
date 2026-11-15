@@ -158,9 +158,9 @@
     view.innerHTML = `<div class="wrap wide">
       <section class="hero">
         <div class="eyebrow">Интерактивный кейс · ${TR.ACTS.length} ${TR.plural(TR.ACTS.length, 'модуль', 'модуля', 'модулей')} · ${TR.LESSONS.length} ${TR.plural(TR.LESSONS.length, 'тренировка', 'тренировки', 'тренировок')}</div>
-        <h1>«Искра Онлайн» открывает API.<br>Контракты, запросы и защита — <em>ваши</em>.</h1>
+        <h1>«Ложка» открывает API.<br>Контракты, запросы и защита — <em>ваши</em>.</h1>
         <svg class="swoosh" viewBox="0 0 1000 60" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="swG" x1="0" x2="1"><stop offset="0" stop-color="#ff6b1a" stop-opacity="0"/><stop offset=".55" stop-color="#ff6b1a"/><stop offset="1" stop-color="#ffb36b"/></linearGradient></defs><path d="M0 58 C260 58 420 52 560 38 C700 24 820 8 1000 4"/></svg>
-        <p class="lede">После запуска к «Искре» выстроилась очередь интеграций: таксопарк «Шашка» хочет записывать свои 120 машин прямо из диспетчерской, ЮKassa присылает вебхуки, 1С ждёт оплаты, а внутренние сервисы общаются по gRPC. Вы — системный аналитик «Орбиты», и вам проектировать API: от первого запроса до прав доступа.</p>
+        <p class="lede">Сервис доставки еды «Ложка» в Екатеринбурге открывает API партнёрам. Первой подключается сеть пиццерий «Тесто»: 25 точек хотят заказывать курьеров прямо из своей кассовой системы. Следом — ЮKassa с вебхуками об оплате, 1С ресторанов и внутренние сервисы, которые общаются по gRPC. Вы — системный аналитик студии «Квант», и вам проектировать API: от первого запроса до прав доступа.</p>
       </section>
       <div class="facts3">
         <div class="fact3"><div class="eyebrow">Задача</div><p>Разобраться в API глубоко: <b>как устроены запросы и HTTP</b>, <b>REST и OpenAPI</b>, <b>gRPC</b>, <b>вебхуки и брокеры</b>, <b>безопасность</b> и <b>проектирование API по требованиям</b>.</p></div>
@@ -182,7 +182,7 @@
         </div>
         <div class="row between"><p class="small dim">Прогресс хранится в этом браузере. Отчёт для преподавателя — кнопка «Отчёт» вверху.</p>${started ? '<button type="button" class="btn sm danger" data-reset-all>⟲ Сбросить всё и начать с нуля</button>' : ''}</div>
       </div>
-      ${ui.say(TR.MENTOR, `Привет! Я Вера. Продолжаем с «Искрой», теперь — API. Идём от простого к сложному: что такое API, HTTP, виды интеграций, REST и OpenAPI, gRPC, вебхуки, безопасность и проектирование. В шапке — «API Искры»: каталог методов, коды ответов и примеры. Заглядывайте туда, когда нужно.`)}
+      ${ui.say(TR.MENTOR, `Привет! Я Ирина, ведущий аналитик «Кванта». Наш новый заказчик — «Ложка», и весь проект про API. Идём от простого к сложному: что такое API, HTTP, виды интеграций, REST и OpenAPI, gRPC, вебхуки, безопасность и проектирование. В шапке — «API Ложки»: каталог методов, коды ответов и живая консоль. Заглядывайте туда, когда нужно.`)}
     </div>`;
     $('#stName').addEventListener('input', e => { TR.S().name = e.target.value; TR.save(); });
     $('#stGroup').addEventListener('input', e => { TR.S().group = e.target.value; TR.save(); });
@@ -251,11 +251,11 @@
   TR.on(view, 'click', '[data-fact]', (e, b) => {
     const f = TR.FACTS[b.dataset.fact]; if (!f) return;
     if (TR.facts.has(f.id)) { ui.toast(`<b>${esc(f.topic)}.</b> ${esc(f.text)}`, '', 6000); return; }
-    const who = TR.PEOPLE[f.who] || TR.PEOPLE.nina;
+    const who = TR.PEOPLE[f.who] || TR.PEOPLE.artur;
     const m = ui.modal({ title: 'Этого нет в блокноте', html: `<p>На встрече вы не спросили про тему «${esc(f.topic)}». Можно написать ${esc(who.name)} и уточнить сейчас, но вопрос вдогонку стоит доверия: <b>−2</b>.</p><div class="row"><button type="button" class="btn primary" data-ask>Уточнить сейчас (−2)</button><button type="button" class="btn ghost" data-x>Обойдусь</button></div>` });
     TR.on(m.body, 'click', '[data-ask]', () => {
       TR.facts.unlock(f.id, 'late'); TR.score(-2, 0, 'вопрос вдогонку: ' + f.topic);
-      m.body.innerHTML = ui.say(f.who || 'nina', esc(f.answer || f.text)) + `<p class="small dim">Записано в блокнот.</p>`;
+      m.body.innerHTML = ui.say(f.who || 'artur', esc(f.answer || f.text)) + `<p class="small dim">Записано в блокнот.</p>`;
       drawFacts(TR.stageById(current));
     });
   });
@@ -319,7 +319,7 @@
     function showExplain() {
       if (!t.explain) return;
       if ($('[data-explain]', card)) return;
-      fb.insertAdjacentHTML('beforeend', `<div class="ref-box" data-explain><div class="eyebrow">Разбор Веры</div><div class="stack">${t.explain}</div></div>`);
+      fb.insertAdjacentHTML('beforeend', `<div class="ref-box" data-explain><div class="eyebrow">Разбор Ирины</div><div class="stack">${t.explain}</div></div>`);
     }
     function doCheck() {
       let r;

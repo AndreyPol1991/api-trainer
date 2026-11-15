@@ -1,8 +1,8 @@
-/* Общие данные тренажёра «Шлюз»: API «Искры Онлайн» для партнёров.
+/* Общие данные тренажёра «Шлюз»: партнёрское API сервиса доставки «Ложка».
    TR.api.CATALOG — каталог методов (для справочника и заданий), TR.api.server() — учебный сервер в памяти:
-   отвечает настоящими HTTP-кодами, заголовками и ошибками в формате RFC 9457, проверяет токен, права, правила записи
-   (BR: запись не раньше чем за 2 часа и не дальше 30 дней, сетка 30 минут, 08:00–21:00, отмена и перенос — не позже чем
-   за 3 часа), ключ идемпотентности, ETag/If-Match. Сервер детерминированный: TR.api.replay(log) прогоняет журнал запросов
+   отвечает настоящими HTTP-кодами, заголовками и ошибками в формате RFC 9457, проверяет токен, права, правила доставки
+   (BR: курьера заказывают не позже чем за 2 часа и не дальше 14 дней, окна по 30 минут, 09:00–23:00, отмена и перенос —
+   не позже чем за 1 час), ключ идемпотентности, ETag/If-Match. Сервер детерминированный: TR.api.replay(log) прогоняет журнал запросов
    на свежем сервере — так проверки заданий остаются чистыми функциями от ответа.
    TR.api.console(el, cfg) — живая консоль запросов с журналом и «миссиями». Плюс помощники: lines() — код с номерами
    и отметками для заданий «найдите ошибки», sha256/hmac/base64url — для JWT. */
@@ -10,10 +10,10 @@
 (function () {
   const TR = window.TR, ui = TR.ui, esc = TR.esc;
   const api = TR.api = {};
-  api.BASE = 'https://api.iskra-online.ru/v1';
-  api.NOW = '2027-03-15T10:00:00+03:00';
-  api.TOKEN = 'shk_test_7Hq2';
-  api.TOKEN_RO = 'shk_ro_51Xa';
+  api.BASE = 'https://api.lozhka.ru/v1';
+  api.NOW = '2027-03-15T10:00:00+05:00';
+  api.TOKEN = 'tst_test_7Hq2';
+  api.TOKEN_RO = 'tst_ro_51Xa';
 
   if (!document.getElementById('api-css')) document.head.insertAdjacentHTML('beforeend', `<style id="api-css">
     .api-root { display: grid; gap: 14px; min-width: 0; }
@@ -76,89 +76,89 @@
   </style>`);
 
   /* ---------- справочные данные ---------- */
-  api.STATIONS = [
-    { id: 'st-1', name: 'Искра на Победы', address: 'Казань, пр. Победы, 141', open: '08:00', close: '21:00' },
-    { id: 'st-2', name: 'Искра на Ямашева', address: 'Казань, пр. Ямашева, 36', open: '08:00', close: '21:00' },
-    { id: 'st-3', name: 'Искра на Горьковском', address: 'Казань, Горьковское ш., 49', open: '08:00', close: '21:00' }
+  api.ZONES = [
+    { id: 'z-1', name: 'Центр', districts: 'Ленинский и Кировский районы', open: '09:00', close: '23:00' },
+    { id: 'z-2', name: 'Уралмаш', districts: 'Орджоникидзевский район', open: '09:00', close: '23:00' },
+    { id: 'z-3', name: 'Академический', districts: 'Академический и Верх-Исетский районы', open: '09:00', close: '23:00' }
   ];
-  api.SERVICES = [
-    { id: 'srv-to', name: 'ТО-1', price_from: 4500, duration_min: 60 },
-    { id: 'srv-tire', name: 'Шиномонтаж', price_from: 2000, duration_min: 30 },
-    { id: 'srv-diag', name: 'Диагностика ходовой', price_from: 1200, duration_min: 30 },
-    { id: 'srv-oil', name: 'Замена масла', price_from: 1500, duration_min: 30 }
+  api.OPTIONS = [
+    { id: 'tf-big', name: 'Большой заказ: до 20 кг, курьер на авто', price_from: 450, duration_min: 60 },
+    { id: 'tf-std', name: 'Стандарт', price_from: 190, duration_min: 30 },
+    { id: 'tf-thermo', name: 'Термобокс для горячего', price_from: 250, duration_min: 30 },
+    { id: 'tf-express', name: 'Экспресс: без попутных заказов', price_from: 390, duration_min: 30 }
   ];
-  api.VEHICLES = [
-    { id: 'v-17', plate: 'А017МР116', model: 'Hyundai Solaris' },
-    { id: 'v-23', plate: 'В223ОК116', model: 'Kia Rio' },
-    { id: 'v-41', plate: 'Е041ТТ116', model: 'Skoda Rapid' }
+  api.POINTS = [
+    { id: 'p-17', name: 'Тесто на Малышева', address: 'ул. Малышева, 51' },
+    { id: 'p-23', name: 'Тесто на Ленина', address: 'пр. Ленина, 24' },
+    { id: 'p-41', name: 'Тесто в Академическом', address: 'ул. Вильгельма де Геннина, 31' }
   ];
-  api.STATUS_RU = { confirmed: 'Подтверждена', cancelled: 'Отменена', completed: 'Завершена', no_show: 'Неявка' };
+  api.STATUS_RU = { confirmed: 'Подтверждена', cancelled: 'Отменена', delivered: 'Доставлена', failed: 'Не доставлена' };
   api.SCOPES = [
-    { s: 'stations:read', t: 'Справочник станций и услуг (открыт без токена)' },
-    { s: 'vehicles:read', t: 'Свои машины партнёра' },
-    { s: 'bookings:read', t: 'Читать свои записи' },
-    { s: 'bookings:write', t: 'Создавать, переносить и отменять свои записи' },
-    { s: 'offers:approve', t: 'Согласовывать доп. работы по своим машинам (завгар)' },
+    { s: 'zones:read', t: 'Справочник зон и опций доставки (открыт без токена)' },
+    { s: 'points:read', t: 'Свои точки партнёра — откуда курьер забирает заказы' },
+    { s: 'deliveries:read', t: 'Читать свои доставки' },
+    { s: 'deliveries:write', t: 'Заказывать, переносить и отменять доставки' },
+    { s: 'surcharges:approve', t: 'Согласовывать доплаты дороже 300 ₽ (управляющий)' },
     { s: 'invoices:read', t: 'Счета и акты за месяц' }
   ];
   api.CATALOG = [
-    { m: 'GET', p: '/stations', t: 'Список станций', auth: false, ok: '200', err: '—' },
-    { m: 'GET', p: '/stations/{station_id}', t: 'Одна станция', auth: false, ok: '200', err: '404' },
-    { m: 'GET', p: '/services', t: 'Каталог услуг с ценой «от» и длительностью', auth: false, ok: '200', err: '—' },
-    { m: 'GET', p: '/stations/{station_id}/slots?date=&service_id=', t: 'Свободные слоты станции на дату', auth: false, ok: '200', err: '400, 404' },
-    { m: 'GET', p: '/vehicles', t: 'Машины партнёра', auth: 'vehicles:read', ok: '200', err: '401, 403' },
-    { m: 'GET', p: '/bookings?status=&station_id=&limit=&cursor=', t: 'Свои записи: фильтр, курсорная пагинация', auth: 'bookings:read', ok: '200', err: '400, 401, 403' },
-    { m: 'POST', p: '/bookings', t: 'Создать запись (Idempotency-Key — по желанию, но лучше всегда)', auth: 'bookings:write', ok: '201 + Location', err: '400, 401, 403, 409, 415, 422' },
-    { m: 'GET', p: '/bookings/{booking_id}', t: 'Одна запись (ETag в ответе)', auth: 'bookings:read', ok: '200', err: '401, 404' },
-    { m: 'PATCH', p: '/bookings/{booking_id}', t: 'Перенести запись: поле start_at (If-Match — по желанию)', auth: 'bookings:write', ok: '200', err: '404, 409, 412, 415, 422' },
-    { m: 'POST', p: '/bookings/{booking_id}/cancel', t: 'Отменить запись (не позже чем за 3 часа)', auth: 'bookings:write', ok: '200', err: '404, 409, 422' }
+    { m: 'GET', p: '/zones', t: 'Список зон доставки', auth: false, ok: '200', err: '—' },
+    { m: 'GET', p: '/zones/{zone_id}', t: 'Одна зона', auth: false, ok: '200', err: '404' },
+    { m: 'GET', p: '/options', t: 'Опции доставки: тариф, цена «от», длительность окна', auth: false, ok: '200', err: '—' },
+    { m: 'GET', p: '/zones/{zone_id}/slots?date=&option_id=', t: 'Свободные окна курьеров в зоне на дату', auth: false, ok: '200', err: '400, 404' },
+    { m: 'GET', p: '/points', t: 'Точки партнёра', auth: 'points:read', ok: '200', err: '401, 403' },
+    { m: 'GET', p: '/deliveries?status=&zone_id=&limit=&cursor=', t: 'Свои доставки: фильтр, курсорная пагинация', auth: 'deliveries:read', ok: '200', err: '400, 401, 403' },
+    { m: 'POST', p: '/deliveries', t: 'Заказать доставку (Idempotency-Key — по желанию, но лучше всегда)', auth: 'deliveries:write', ok: '201 + Location', err: '400, 401, 403, 409, 415, 422' },
+    { m: 'GET', p: '/deliveries/{delivery_id}', t: 'Одна доставка (ETag в ответе)', auth: 'deliveries:read', ok: '200', err: '401, 404' },
+    { m: 'PATCH', p: '/deliveries/{delivery_id}', t: 'Перенести доставку на другое окно: start_at (If-Match — по желанию)', auth: 'deliveries:write', ok: '200', err: '404, 409, 412, 415, 422' },
+    { m: 'POST', p: '/deliveries/{delivery_id}/cancel', t: 'Отменить доставку (не позже чем за 1 час до окна)', auth: 'deliveries:write', ok: '200', err: '404, 409, 422' }
   ];
   api.CODES = [
     ['200 OK', 'Запрос выполнен, в теле — результат'], ['201 Created', 'Создан новый ресурс; адрес — в заголовке Location'], ['202 Accepted', 'Принято в работу, результат будет позже'], ['204 No Content', 'Выполнено, тела нет'],
     ['304 Not Modified', 'Ресурс не изменился (ответ на If-None-Match) — берите из кеша'],
     ['400 Bad Request', 'Запрос не разобрать: битый JSON, неверный параметр'], ['401 Unauthorized', 'Не аутентифицирован: нет токена или он недействителен'], ['403 Forbidden', 'Аутентифицирован, но прав нет (не хватает scope)'], ['404 Not Found', 'Ресурса нет — или он чужой и мы не раскрываем, что он есть'],
-    ['405 Method Not Allowed', 'Метод для этого адреса не поддерживается; список — в Allow'], ['406 Not Acceptable', 'Сервер не умеет отдать формат из Accept'], ['409 Conflict', 'Конфликт с текущим состоянием: слот занят, запись уже отменена'], ['412 Precondition Failed', 'Не совпал If-Match: ресурс успели изменить'],
+    ['405 Method Not Allowed', 'Метод для этого адреса не поддерживается; список — в Allow'], ['406 Not Acceptable', 'Сервер не умеет отдать формат из Accept'], ['409 Conflict', 'Конфликт с текущим состоянием: окно занято, доставка уже отменена'], ['412 Precondition Failed', 'Не совпал If-Match: ресурс успели изменить'],
     ['415 Unsupported Media Type', 'Тело не в том формате (Content-Type)'], ['422 Unprocessable Content', 'JSON разобран, но данные не проходят проверки и правила'], ['429 Too Many Requests', 'Превышен лимит; когда повторить — в Retry-After'],
     ['500 Internal Server Error', 'Ошибка на сервере'], ['502 Bad Gateway', 'Шлюз получил плохой ответ от сервиса за ним'], ['503 Service Unavailable', 'Сервис временно недоступен (часто с Retry-After)'], ['504 Gateway Timeout', 'Сервис за шлюзом не ответил вовремя']
   ];
   api.STATUS_TEXT = { 200: 'OK', 201: 'Created', 202: 'Accepted', 204: 'No Content', 304: 'Not Modified', 400: 'Bad Request', 401: 'Unauthorized', 403: 'Forbidden', 404: 'Not Found', 405: 'Method Not Allowed', 406: 'Not Acceptable', 409: 'Conflict', 412: 'Precondition Failed', 415: 'Unsupported Media Type', 422: 'Unprocessable Content', 429: 'Too Many Requests', 500: 'Internal Server Error', 503: 'Service Unavailable' };
 
   const PRESETS = [
-    { t: 'GET /stations — список станций', req: { method: 'GET', url: '/v1/stations', headers: '', body: '' } },
-    { t: 'GET /services — каталог услуг', req: { method: 'GET', url: '/v1/services', headers: '', body: '' } },
-    { t: 'GET слоты станции на 16 марта под ТО', req: { method: 'GET', url: '/v1/stations/st-1/slots?date=2027-03-16&service_id=srv-to', headers: '', body: '' } },
-    { t: 'GET /bookings — мои записи', req: { method: 'GET', url: '/v1/bookings', headers: 'Authorization: Bearer ' + api.TOKEN, body: '' } },
-    { t: 'POST /bookings — новая запись', req: { method: 'POST', url: '/v1/bookings', headers: 'Authorization: Bearer ' + api.TOKEN + '\nContent-Type: application/json\nIdempotency-Key: 2f6c1d0e-demo', body: '{\n  "station_id": "st-1",\n  "vehicle_id": "v-41",\n  "service_ids": ["srv-to"],\n  "start_at": "2027-03-16T15:00:00+03:00",\n  "comment": "Стук спереди справа"\n}' } },
-    { t: 'POST /bookings/bk-0998/cancel — отменить', req: { method: 'POST', url: '/v1/bookings/bk-0998/cancel', headers: 'Authorization: Bearer ' + api.TOKEN, body: '' } }
+    { t: 'GET /zones — зоны доставки', req: { method: 'GET', url: '/v1/zones', headers: '', body: '' } },
+    { t: 'GET /options — опции доставки', req: { method: 'GET', url: '/v1/options', headers: '', body: '' } },
+    { t: 'GET окна в зоне «Центр» на 16 марта под большой заказ', req: { method: 'GET', url: '/v1/zones/z-1/slots?date=2027-03-16&option_id=tf-big', headers: '', body: '' } },
+    { t: 'GET /deliveries — мои доставки', req: { method: 'GET', url: '/v1/deliveries', headers: 'Authorization: Bearer ' + api.TOKEN, body: '' } },
+    { t: 'POST /deliveries — заказать доставку', req: { method: 'POST', url: '/v1/deliveries', headers: 'Authorization: Bearer ' + api.TOKEN + '\nContent-Type: application/json\nIdempotency-Key: 2f6c1d0e-demo', body: '{\n  "zone_id": "z-1",\n  "point_id": "p-41",\n  "option_ids": ["tf-big"],\n  "start_at": "2027-03-16T15:00:00+05:00",\n  "comment": "Стук спереди справа"\n}' } },
+    { t: 'POST /deliveries/dl-0998/cancel — отменить', req: { method: 'POST', url: '/v1/deliveries/dl-0998/cancel', headers: 'Authorization: Bearer ' + api.TOKEN, body: '' } }
   ];
   api.PRESETS = PRESETS;
 
   /* ---------- время ---------- */
   const pad = n => String(n).padStart(2, '0');
-  const MSK = 3 * 60;
+  const MSK = 5 * 60;
   const parseT = s => { if (typeof s !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?(Z|[+-]\d{2}:\d{2})$/.test(s)) return null; const t = Date.parse(s); return isNaN(t) ? null : t / 60000; };
-  const fmtT = min => { const d = new Date((min + MSK) * 60000); return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}T${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:00+03:00`; };
+  const fmtT = min => { const d = new Date((min + MSK) * 60000); return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}T${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:00+05:00`; };
   const mskHM = min => { const d = new Date((min + MSK) * 60000); return d.getUTCHours() * 60 + d.getUTCMinutes(); };
   const mskDate = min => fmtT(min).slice(0, 10);
   api.fmtT = fmtT; api.parseT = parseT;
   const NOW = parseT(api.NOW);
 
   /* ---------- учебный сервер ---------- */
-  const PROB = 'https://api.iskra-online.ru/problems/';
+  const PROB = 'https://api.lozhka.ru/problems/';
   function server() {
     const st = {
       seq: 1000, req: 0,
-      bookings: [
-        { id: 'bk-0990', owner: 'shashka', status: 'completed', station_id: 'st-2', vehicle_id: 'v-41', service_ids: ['srv-diag'], start: parseT('2027-03-12T10:00:00+03:00'), comment: '', created: parseT('2027-03-10T12:15:00+03:00'), v: 3 },
-        { id: 'bk-0998', owner: 'shashka', status: 'confirmed', station_id: 'st-1', vehicle_id: 'v-17', service_ids: ['srv-tire'], start: parseT('2027-03-16T09:00:00+03:00'), comment: 'Смена резины на летнюю', created: parseT('2027-03-14T18:02:00+03:00'), v: 1 },
-        { id: 'bk-0999', owner: 'shashka', status: 'confirmed', station_id: 'st-1', vehicle_id: 'v-23', service_ids: ['srv-to'], start: parseT('2027-03-16T11:00:00+03:00'), comment: '', created: parseT('2027-03-14T18:05:00+03:00'), v: 1 },
-        { id: 'bk-0777', owner: 'elena', status: 'confirmed', station_id: 'st-1', vehicle_id: 'v-900', service_ids: ['srv-oil'], start: parseT('2027-03-16T14:00:00+03:00'), comment: '', created: parseT('2027-03-13T09:00:00+03:00'), v: 1 }
+      deliveries: [
+        { id: 'dl-0990', owner: 'testo', status: 'delivered', zone_id: 'z-2', point_id: 'p-41', option_ids: ['tf-thermo'], start: parseT('2027-03-12T10:00:00+05:00'), comment: '', created: parseT('2027-03-10T12:15:00+05:00'), v: 3 },
+        { id: 'dl-0998', owner: 'testo', status: 'confirmed', zone_id: 'z-1', point_id: 'p-17', option_ids: ['tf-std'], start: parseT('2027-03-16T09:00:00+05:00'), comment: 'Домофон не работает — позвонить', created: parseT('2027-03-14T18:02:00+05:00'), v: 1 },
+        { id: 'dl-0999', owner: 'testo', status: 'confirmed', zone_id: 'z-1', point_id: 'p-23', option_ids: ['tf-big'], start: parseT('2027-03-16T11:00:00+05:00'), comment: '', created: parseT('2027-03-14T18:05:00+05:00'), v: 1 },
+        { id: 'dl-0777', owner: 'burger', status: 'confirmed', zone_id: 'z-1', point_id: 'p-900', option_ids: ['tf-express'], start: parseT('2027-03-16T14:00:00+05:00'), comment: '', created: parseT('2027-03-13T09:00:00+05:00'), v: 1 }
       ],
       idem: {}
     };
-    const dur = ids => Math.ceil(ids.reduce((s, id) => s + ((api.SERVICES.find(x => x.id === id) || {}).duration_min || 30), 0) / 30) * 30;
-    const view = b => ({ id: b.id, status: b.status, station_id: b.station_id, vehicle_id: b.vehicle_id, service_ids: b.service_ids.slice(), start_at: fmtT(b.start), end_at: fmtT(b.start + dur(b.service_ids)), price_from: b.service_ids.reduce((s, id) => s + ((api.SERVICES.find(x => x.id === id) || {}).price_from || 0), 0), comment: b.comment, created_at: fmtT(b.created) });
-    const busy = (station, start, d, skip) => st.bookings.some(b => b.station_id === station && b.status === 'confirmed' && b.id !== skip && start < b.start + dur(b.service_ids) && b.start < start + d);
+    const dur = ids => Math.ceil(ids.reduce((s, id) => s + ((api.OPTIONS.find(x => x.id === id) || {}).duration_min || 30), 0) / 30) * 30;
+    const view = b => ({ id: b.id, status: b.status, zone_id: b.zone_id, point_id: b.point_id, option_ids: b.option_ids.slice(), start_at: fmtT(b.start), end_at: fmtT(b.start + dur(b.option_ids)), price_from: b.option_ids.reduce((s, id) => s + ((api.OPTIONS.find(x => x.id === id) || {}).price_from || 0), 0), comment: b.comment, created_at: fmtT(b.created) });
+    const busy = (zone, start, d, skip) => st.deliveries.some(b => b.zone_id === zone && b.status === 'confirmed' && b.id !== skip && start < b.start + dur(b.option_ids) && b.start < start + d);
 
     function res(status, body, headers) {
       const h = Object.assign({}, headers || {});
@@ -174,9 +174,9 @@
       const H = {}; const htxt = rq.headers || '';
       (typeof htxt === 'string' ? htxt.split('\n') : Object.entries(htxt).map(([k, v]) => k + ': ' + v)).forEach(l => { const m = String(l).match(/^\s*([\w-]+)\s*:\s*(.*?)\s*$/); if (m) H[m[1].toLowerCase()] = m[2]; });
       let url = String(rq.url || '').trim();
-      if (!url) return prob(400, 'bad-request', 'Пустой адрес', 'Укажите адрес запроса, например /v1/stations.');
+      if (!url) return prob(400, 'bad-request', 'Пустой адрес', 'Укажите адрес запроса, например /v1/zones.');
       url = url.replace(/^https?:\/\/api\.iskra-online\.ru/i, '');
-      if (/^https?:\/\//i.test(url)) return prob(400, 'bad-request', 'Чужой адрес', 'Учебная консоль ходит только в https://api.iskra-online.ru.');
+      if (/^https?:\/\//i.test(url)) return prob(400, 'bad-request', 'Чужой адрес', 'Учебная консоль ходит только в https://api.lozhka.ru.');
       const [pathRaw, qs] = url.split('?');
       const Q = {}; (qs || '').split('&').filter(Boolean).forEach(kv => { const [k, v] = kv.split('='); try { Q[decodeURIComponent(k)] = decodeURIComponent(v || ''); } catch (e) { Q[k] = v || ''; } });
       if (!/^\/v1(\/|$)/.test(pathRaw)) return prob(404, 'not-found', 'Нет такого адреса', `Все методы начинаются с /v1, а пришло ${pathRaw}. Версия API — часть адреса.`);
@@ -190,12 +190,12 @@
       // аутентификация
       let who = null; const auth = H.authorization;
       const needAuth = () => {
-        if (!auth) return prob(401, 'unauthorized', 'Нужна аутентификация', 'Передайте токен в заголовке Authorization: Bearer <токен>.', null, { 'WWW-Authenticate': 'Bearer realm="iskra"' });
+        if (!auth) return prob(401, 'unauthorized', 'Нужна аутентификация', 'Передайте токен в заголовке Authorization: Bearer <токен>.', null, { 'WWW-Authenticate': 'Bearer realm="lozhka"' });
         const m = auth.match(/^Bearer\s+(\S+)$/i);
-        if (!m) return prob(401, 'unauthorized', 'Неверная схема', 'Ожидается схема Bearer: Authorization: Bearer <токен>.', null, { 'WWW-Authenticate': 'Bearer realm="iskra"' });
-        if (m[1] === api.TOKEN) who = { p: 'shashka', scopes: ['vehicles:read', 'bookings:read', 'bookings:write'] };
-        else if (m[1] === api.TOKEN_RO) who = { p: 'shashka', scopes: ['vehicles:read', 'bookings:read'] };
-        else return prob(401, 'unauthorized', 'Токен недействителен', 'Токен не найден или отозван.', null, { 'WWW-Authenticate': 'Bearer realm="iskra", error="invalid_token"' });
+        if (!m) return prob(401, 'unauthorized', 'Неверная схема', 'Ожидается схема Bearer: Authorization: Bearer <токен>.', null, { 'WWW-Authenticate': 'Bearer realm="lozhka"' });
+        if (m[1] === api.TOKEN) who = { p: 'testo', scopes: ['points:read', 'deliveries:read', 'deliveries:write'] };
+        else if (m[1] === api.TOKEN_RO) who = { p: 'testo', scopes: ['points:read', 'deliveries:read'] };
+        else return prob(401, 'unauthorized', 'Токен недействителен', 'Токен не найден или отозван.', null, { 'WWW-Authenticate': 'Bearer realm="lozhka", error="invalid_token"' });
         return null;
       };
       const scope = s => who.scopes.includes(s) ? null : prob(403, 'forbidden', 'Недостаточно прав', `Для этого метода нужен scope ${s}, у токена его нет.`, null, { 'WWW-Authenticate': `Bearer error="insufficient_scope", scope="${s}"` });
@@ -210,46 +210,46 @@
         return null;
       };
       const slotRules = (start, d, errs, field) => {
-        if (start == null) { errs.push({ field, code: 'format', message: 'Дата и время в формате ISO 8601 со смещением: 2027-03-16T15:00:00+03:00' }); return; }
+        if (start == null) { errs.push({ field, code: 'format', message: 'Дата и время в формате ISO 8601 со смещением: 2027-03-16T15:00:00+05:00' }); return; }
         const hm = mskHM(start);
-        if (hm % 30) errs.push({ field, code: 'grid', message: 'Запись — только на начало получаса: 15:00, 15:30…' });
-        if (hm < 8 * 60 || hm + d > 21 * 60) errs.push({ field, code: 'hours', message: 'Станции работают 08:00–21:00; запись должна закончиться до 21:00.' });
-        if (start < NOW + 120) errs.push({ field, code: 'too_soon', message: 'Онлайн-запись — не позже чем за 2 часа до начала.' });
-        if (start > NOW + 30 * 24 * 60) errs.push({ field, code: 'too_far', message: 'Онлайн-запись — не дальше чем на 30 дней вперёд.' });
+        if (hm % 30) errs.push({ field, code: 'grid', message: 'Окно — только с начала получаса: 15:00, 15:30…' });
+        if (hm < 9 * 60 || hm + d > 23 * 60) errs.push({ field, code: 'hours', message: 'Курьеры работают 09:00–23:00; окно должно закончиться до 23:00.' });
+        if (start < NOW + 120) errs.push({ field, code: 'too_soon', message: 'Курьера заказывают не позже чем за 2 часа до окна.' });
+        if (start > NOW + 14 * 24 * 60) errs.push({ field, code: 'too_far', message: 'Заказать курьера можно не дальше чем на 14 дней вперёд.' });
       };
-      const find = id => st.bookings.find(b => b.id === id && b.owner === who.p);
+      const find = id => st.deliveries.find(b => b.id === id && b.owner === who.p);
 
       // маршруты
-      if (seg[0] === 'stations') {
+      if (seg[0] === 'zones') {
         if (method !== 'GET') return allow('GET');
-        if (seg.length === 1) return res(200, { items: api.STATIONS.map(x => Object.assign({}, x)) }, rl);
-        const s = api.STATIONS.find(x => x.id === seg[1]);
-        if (!s) return prob(404, 'not-found', 'Станция не найдена', `Станции ${seg[1]} нет. Список — GET /v1/stations.`);
+        if (seg.length === 1) return res(200, { items: api.ZONES.map(x => Object.assign({}, x)) }, rl);
+        const s = api.ZONES.find(x => x.id === seg[1]);
+        if (!s) return prob(404, 'not-found', 'Зона не найдена', `Зоны ${seg[1]} нет. Список — GET /v1/zones.`);
         if (seg.length === 2) return res(200, Object.assign({}, s), rl);
         if (seg[2] === 'slots' && seg.length === 3) {
           if (!Q.date) return prob(400, 'bad-request', 'Не хватает параметра', 'Укажите дату: ?date=2027-03-16', { errors: [{ field: 'date', code: 'required', message: 'Обязательный параметр' }] });
           if (!/^\d{4}-\d{2}-\d{2}$/.test(Q.date)) return prob(400, 'bad-request', 'Неверный параметр', 'Дата — в формате ГГГГ-ММ-ДД.', { errors: [{ field: 'date', code: 'format', message: 'Формат ГГГГ-ММ-ДД' }] });
-          const srv = Q.service_id ? api.SERVICES.find(x => x.id === Q.service_id) : null;
-          if (Q.service_id && !srv) return prob(400, 'bad-request', 'Неверный параметр', `Услуги ${Q.service_id} нет. Каталог — GET /v1/services.`, { errors: [{ field: 'service_id', code: 'unknown', message: 'Нет такой услуги' }] });
-          const d = srv ? Math.ceil(srv.duration_min / 30) * 30 : 30, out = [], day = parseT(Q.date + 'T00:00:00+03:00');
-          for (let m = 8 * 60; m + d <= 21 * 60; m += 30) { const t = day + m; if (t >= NOW + 120 && !busy(s.id, t, d)) out.push(`${pad(Math.floor(m / 60))}:${pad(m % 60)}`); }
-          return res(200, { station_id: s.id, date: Q.date, service_id: srv ? srv.id : null, duration_min: d, slots: out }, rl);
+          const srv = Q.option_id ? api.OPTIONS.find(x => x.id === Q.option_id) : null;
+          if (Q.option_id && !srv) return prob(400, 'bad-request', 'Неверный параметр', `Опции ${Q.option_id} нет. Каталог — GET /v1/options.`, { errors: [{ field: 'option_id', code: 'unknown', message: 'Нет такой опции' }] });
+          const d = srv ? Math.ceil(srv.duration_min / 30) * 30 : 30, out = [], day = parseT(Q.date + 'T00:00:00+05:00');
+          for (let m = 9 * 60; m + d <= 23 * 60; m += 30) { const t = day + m; if (t >= NOW + 120 && !busy(s.id, t, d)) out.push(`${pad(Math.floor(m / 60))}:${pad(m % 60)}`); }
+          return res(200, { zone_id: s.id, date: Q.date, option_id: srv ? srv.id : null, duration_min: d, slots: out }, rl);
         }
         return prob(404, 'not-found', 'Нет такого адреса', `Метода ${pathRaw} нет.`);
       }
-      if (seg[0] === 'services' && seg.length === 1) { if (method !== 'GET') return allow('GET'); return res(200, { items: api.SERVICES.map(x => Object.assign({}, x)) }, rl); }
-      if (seg[0] === 'vehicles' && seg.length === 1) {
+      if (seg[0] === 'options' && seg.length === 1) { if (method !== 'GET') return allow('GET'); return res(200, { items: api.OPTIONS.map(x => Object.assign({}, x)) }, rl); }
+      if (seg[0] === 'points' && seg.length === 1) {
         if (method !== 'GET') return allow('GET');
-        const e = needAuth() || scope('vehicles:read'); if (e) return e;
-        return res(200, { items: api.VEHICLES.map(x => Object.assign({}, x)) }, rl);
+        const e = needAuth() || scope('points:read'); if (e) return e;
+        return res(200, { items: api.POINTS.map(x => Object.assign({}, x)) }, rl);
       }
-      if (seg[0] === 'bookings') {
+      if (seg[0] === 'deliveries') {
         if (seg.length === 1) {
           if (method === 'GET') {
-            const e = needAuth() || scope('bookings:read'); if (e) return e;
-            let list = st.bookings.filter(b => b.owner === who.p).sort((a, b) => a.start - b.start || (a.id < b.id ? -1 : 1));
+            const e = needAuth() || scope('deliveries:read'); if (e) return e;
+            let list = st.deliveries.filter(b => b.owner === who.p).sort((a, b) => a.start - b.start || (a.id < b.id ? -1 : 1));
             if (Q.status) { if (!api.STATUS_RU[Q.status]) return prob(400, 'bad-request', 'Неверный параметр', `status — одно из: ${Object.keys(api.STATUS_RU).join(', ')}.`, { errors: [{ field: 'status', code: 'enum', message: 'Недопустимое значение' }] }); list = list.filter(b => b.status === Q.status); }
-            if (Q.station_id) list = list.filter(b => b.station_id === Q.station_id);
+            if (Q.zone_id) list = list.filter(b => b.zone_id === Q.zone_id);
             const limit = Q.limit == null ? 20 : +Q.limit;
             if (!Number.isInteger(limit) || limit < 1 || limit > 100) return prob(400, 'bad-request', 'Неверный параметр', 'limit — целое от 1 до 100.', { errors: [{ field: 'limit', code: 'range', message: 'От 1 до 100' }] });
             let from = 0;
@@ -258,27 +258,27 @@
             return res(200, { items: page.map(view), next_cursor: more ? btoa(page[page.length - 1].id) : null }, rl);
           }
           if (method === 'POST') {
-            const e = needAuth() || scope('bookings:write') || readBody(['application/json']); if (e) return e;
+            const e = needAuth() || scope('deliveries:write') || readBody(['application/json']); if (e) return e;
             const key = H['idempotency-key'], hash = JSON.stringify(body);
             if (key && st.idem[key]) {
-              if (st.idem[key].hash !== hash) return prob(422, 'idempotency-key-reuse', 'Ключ уже использован', 'Этот Idempotency-Key уже был у запроса с другим телом. Для новой записи — новый ключ.');
+              if (st.idem[key].hash !== hash) return prob(422, 'idempotency-key-reuse', 'Ключ уже использован', 'Этот Idempotency-Key уже был у запроса с другим телом. Для новой доставки — новый ключ.');
               const r0 = st.idem[key].res; return Object.assign({}, r0, { headers: Object.assign({}, r0.headers, { 'Idempotent-Replayed': 'true' }) });
             }
             const errs = [];
-            const allowed = ['station_id', 'vehicle_id', 'service_ids', 'start_at', 'comment'];
+            const allowed = ['zone_id', 'point_id', 'option_ids', 'start_at', 'comment'];
             Object.keys(body).forEach(k => { if (!allowed.includes(k)) errs.push({ field: k, code: 'unknown_field', message: 'Поле не поддерживается: его нельзя задать при создании' }); });
-            if (!body.station_id) errs.push({ field: 'station_id', code: 'required', message: 'Обязательное поле' }); else if (!api.STATIONS.some(x => x.id === body.station_id)) errs.push({ field: 'station_id', code: 'unknown', message: 'Нет такой станции' });
-            if (!body.vehicle_id) errs.push({ field: 'vehicle_id', code: 'required', message: 'Обязательное поле' }); else if (!api.VEHICLES.some(x => x.id === body.vehicle_id)) errs.push({ field: 'vehicle_id', code: 'unknown', message: 'Это не ваша машина: список — GET /v1/vehicles' });
-            const ids = body.service_ids;
-            if (!Array.isArray(ids) || !ids.length) errs.push({ field: 'service_ids', code: 'required', message: 'Непустой массив id услуг' }); else ids.forEach((id, i) => { if (!api.SERVICES.some(x => x.id === id)) errs.push({ field: `service_ids[${i}]`, code: 'unknown', message: 'Нет такой услуги' }); });
+            if (!body.zone_id) errs.push({ field: 'zone_id', code: 'required', message: 'Обязательное поле' }); else if (!api.ZONES.some(x => x.id === body.zone_id)) errs.push({ field: 'zone_id', code: 'unknown', message: 'Нет такой зоны' });
+            if (!body.point_id) errs.push({ field: 'point_id', code: 'required', message: 'Обязательное поле' }); else if (!api.POINTS.some(x => x.id === body.point_id)) errs.push({ field: 'point_id', code: 'unknown', message: 'Это не ваша точка: список — GET /v1/points' });
+            const ids = body.option_ids;
+            if (!Array.isArray(ids) || !ids.length) errs.push({ field: 'option_ids', code: 'required', message: 'Непустой массив id опций доставки' }); else ids.forEach((id, i) => { if (!api.OPTIONS.some(x => x.id === id)) errs.push({ field: `option_ids[${i}]`, code: 'unknown', message: 'Нет такой опции' }); });
             if (body.comment != null && (typeof body.comment !== 'string' || body.comment.length > 500)) errs.push({ field: 'comment', code: 'format', message: 'Строка до 500 символов' });
             const start = body.start_at == null ? undefined : parseT(body.start_at), d = Array.isArray(ids) && ids.length ? dur(ids.filter(x => typeof x === 'string')) : 30;
             if (start === undefined) errs.push({ field: 'start_at', code: 'required', message: 'Обязательное поле' }); else slotRules(start, d, errs, 'start_at');
             if (errs.length) return prob(422, 'validation-error', 'Данные не прошли проверку', 'Исправьте поля из списка errors.', { errors: errs });
-            if (busy(body.station_id, start, d)) return prob(409, 'slot-taken', 'Слот занят', `На ${fmtT(start).slice(11, 16)} ${mskDate(start)} станция уже занята. Свободные слоты — GET /v1/stations/${body.station_id}/slots?date=${mskDate(start)}.`);
-            const b = { id: 'bk-' + (++st.seq), owner: who.p, status: 'confirmed', station_id: body.station_id, vehicle_id: body.vehicle_id, service_ids: ids.slice(), start, comment: body.comment || '', created: NOW, v: 1 };
-            st.bookings.push(b);
-            const r = res(201, view(b), Object.assign({ Location: '/v1/bookings/' + b.id, ETag: `"v${b.v}"` }, rl));
+            if (busy(body.zone_id, start, d)) return prob(409, 'slot-taken', 'Слот занят', `На ${fmtT(start).slice(11, 16)} ${mskDate(start)} окно в зоне уже занято. Свободные окна — GET /v1/zones/${body.zone_id}/slots?date=${mskDate(start)}.`);
+            const b = { id: 'dl-' + (++st.seq), owner: who.p, status: 'confirmed', zone_id: body.zone_id, point_id: body.point_id, option_ids: ids.slice(), start, comment: body.comment || '', created: NOW, v: 1 };
+            st.deliveries.push(b);
+            const r = res(201, view(b), Object.assign({ Location: '/v1/deliveries/' + b.id, ETag: `"v${b.v}"` }, rl));
             if (key) st.idem[key] = { hash, res: r };
             return r;
           }
@@ -287,22 +287,22 @@
         const e0 = needAuth(); if (e0) return e0;
         const b = find(seg[1]);
         if (seg.length === 2) {
-          if (method === 'GET') { const e = scope('bookings:read'); if (e) return e; if (!b) return prob(404, 'not-found', 'Запись не найдена', `Записи ${seg[1]} нет среди ваших.`); if (H['if-none-match'] === `"v${b.v}"`) return res(304, null, { ETag: `"v${b.v}"` }); return res(200, view(b), Object.assign({ ETag: `"v${b.v}"` }, rl)); }
+          if (method === 'GET') { const e = scope('deliveries:read'); if (e) return e; if (!b) return prob(404, 'not-found', 'Доставка не найдена', `Доставки ${seg[1]} нет среди ваших.`); if (H['if-none-match'] === `"v${b.v}"`) return res(304, null, { ETag: `"v${b.v}"` }); return res(200, view(b), Object.assign({ ETag: `"v${b.v}"` }, rl)); }
           if (method === 'PATCH') {
-            const e = scope('bookings:write') || readBody(['application/json', 'application/merge-patch+json']); if (e) return e;
-            if (!b) return prob(404, 'not-found', 'Запись не найдена', `Записи ${seg[1]} нет среди ваших.`);
-            if (H['if-match'] && H['if-match'] !== `"v${b.v}"`) return prob(412, 'precondition-failed', 'Запись уже изменили', `If-Match ${H['if-match']}, а текущая версия "v${b.v}". Перечитайте запись и повторите.`);
+            const e = scope('deliveries:write') || readBody(['application/json', 'application/merge-patch+json']); if (e) return e;
+            if (!b) return prob(404, 'not-found', 'Доставка не найдена', `Доставки ${seg[1]} нет среди ваших.`);
+            if (H['if-match'] && H['if-match'] !== `"v${b.v}"`) return prob(412, 'precondition-failed', 'Доставку уже изменили', `If-Match ${H['if-match']}, а текущая версия "v${b.v}". Перечитайте доставку и повторите.`);
             const errs = [];
-            Object.keys(body).forEach(k => { if (k !== 'start_at' && k !== 'comment') errs.push({ field: k, code: 'read_only', message: k === 'status' ? 'Статус меняется действиями: отмена — POST /v1/bookings/{id}/cancel' : 'Поле нельзя изменить переносом' }); });
+            Object.keys(body).forEach(k => { if (k !== 'start_at' && k !== 'comment') errs.push({ field: k, code: 'read_only', message: k === 'status' ? 'Статус меняется действиями: отмена — POST /v1/deliveries/{id}/cancel' : 'Поле нельзя изменить переносом' }); });
             if (!Object.keys(body).length) errs.push({ field: 'start_at', code: 'required', message: 'Передайте новое время start_at' });
             if (errs.length) return prob(422, 'validation-error', 'Данные не прошли проверку', 'Исправьте поля из списка errors.', { errors: errs });
-            if (b.status !== 'confirmed') return prob(409, 'conflict', 'Запись нельзя перенести', `Запись в статусе «${api.STATUS_RU[b.status]}».`);
+            if (b.status !== 'confirmed') return prob(409, 'conflict', 'Доставку нельзя перенести', `Доставка в статусе «${api.STATUS_RU[b.status]}».`);
             if (body.start_at !== undefined) {
-              if (b.start - NOW < 180) return prob(422, 'change-window-closed', 'Поздно переносить', 'Перенос — не позже чем за 3 часа до начала записи.');
-              const start = parseT(body.start_at), d = dur(b.service_ids), er2 = [];
+              if (b.start - NOW < 60) return prob(422, 'change-window-closed', 'Поздно переносить', 'Перенос — не позже чем за 1 час до окна.');
+              const start = parseT(body.start_at), d = dur(b.option_ids), er2 = [];
               slotRules(start, d, er2, 'start_at');
               if (er2.length) return prob(422, 'validation-error', 'Данные не прошли проверку', 'Исправьте поля из списка errors.', { errors: er2 });
-              if (busy(b.station_id, start, d, b.id)) return prob(409, 'slot-taken', 'Слот занят', `На ${fmtT(start).slice(11, 16)} станция уже занята.`);
+              if (busy(b.zone_id, start, d, b.id)) return prob(409, 'slot-taken', 'Слот занят', `На ${fmtT(start).slice(11, 16)} окно в зоне уже занято.`);
               b.start = start;
             }
             if (body.comment !== undefined) b.comment = String(body.comment);
@@ -313,17 +313,17 @@
         }
         if (seg.length === 3 && seg[2] === 'cancel') {
           if (method !== 'POST') return allow('POST');
-          const e = scope('bookings:write') || readBody(['application/json']); if (e) return e;
-          if (!b) return prob(404, 'not-found', 'Запись не найдена', `Записи ${seg[1]} нет среди ваших.`);
-          if (b.status === 'cancelled') return prob(409, 'conflict', 'Уже отменена', 'Запись уже в статусе «Отменена».');
-          if (b.status !== 'confirmed') return prob(409, 'conflict', 'Запись нельзя отменить', `Запись в статусе «${api.STATUS_RU[b.status]}».`);
-          if (b.start - NOW < 180) return prob(422, 'cancel-window-closed', 'Поздно отменять', 'Бесплатная отмена — не позже чем за 3 часа до начала. Позвоните на станцию.');
+          const e = scope('deliveries:write') || readBody(['application/json']); if (e) return e;
+          if (!b) return prob(404, 'not-found', 'Доставка не найдена', `Доставки ${seg[1]} нет среди ваших.`);
+          if (b.status === 'cancelled') return prob(409, 'conflict', 'Уже отменена', 'Доставка уже в статусе «Отменена».');
+          if (b.status !== 'confirmed') return prob(409, 'conflict', 'Доставку нельзя отменить', `Доставка в статусе «${api.STATUS_RU[b.status]}».`);
+          if (b.start - NOW < 60) return prob(422, 'cancel-window-closed', 'Поздно отменять', 'Бесплатная отмена — не позже чем за 1 час до окна. Дальше — через поддержку «Ложки».');
           b.status = 'cancelled'; b.v++;
           return res(200, view(b), Object.assign({ ETag: `"v${b.v}"` }, rl));
         }
         return prob(404, 'not-found', 'Нет такого адреса', `Метода ${pathRaw} нет.`);
       }
-      return prob(404, 'not-found', 'Нет такого адреса', `Метода ${pathRaw} нет. Каталог — в справочнике «API Искры».`);
+      return prob(404, 'not-found', 'Нет такого адреса', `Метода ${pathRaw} нет. Каталог — в справочнике «API Ложки».`);
     }
     return { call, state: st };
   }
@@ -334,7 +334,7 @@
   api.reqText = rq => {
     const u = String(rq.url || '').replace(/^https?:\/\/api\.iskra-online\.ru/i, '');
     const hs = String(rq.headers || '').split('\n').map(s => s.trim()).filter(Boolean);
-    return `${String(rq.method || 'GET').toUpperCase()} ${u} HTTP/1.1\nHost: api.iskra-online.ru${hs.length ? '\n' + hs.join('\n') : ''}${rq.body && String(rq.body).trim() ? '\n\n' + String(rq.body).trim() : ''}`;
+    return `${String(rq.method || 'GET').toUpperCase()} ${u} HTTP/1.1\nHost: api.lozhka.ru${hs.length ? '\n' + hs.join('\n') : ''}${rq.body && String(rq.body).trim() ? '\n\n' + String(rq.body).trim() : ''}`;
   };
   api.resText = r => `HTTP/1.1 ${r.status} ${r.statusText}\n${Object.entries(r.headers).map(([k, v]) => k + ': ' + v).join('\n')}${r.body != null ? '\n\n' + JSON.stringify(r.body, null, 2) : ''}`;
 
@@ -343,7 +343,7 @@
   api.console = (el, cfg) => {
     const log = (cfg.log || []).slice();
     let cur = log.length - 1;
-    const blank = cfg.start || { method: 'GET', url: '/v1/stations', headers: '', body: '' };
+    const blank = cfg.start || { method: 'GET', url: '/v1/zones', headers: '', body: '' };
     let draft = Object.assign({}, cur >= 0 ? log[cur] : blank);
     function draw() {
       const R = api.replay(log), last = cur >= 0 ? R[cur] : null;
@@ -351,7 +351,7 @@
       el.innerHTML = `<div class="api-con">
         ${cfg.readonly ? '' : `${cfg.presets ? `<div><div class="lbl">Готовые запросы</div><select data-pre><option value="">— выберите, чтобы подставить —</option>${cfg.presets.map((p, i) => `<option value="${i}">${esc(p.t)}</option>`).join('')}</select></div>` : ''}
         <div class="reqline"><select data-f="method" aria-label="Метод">${['GET', 'POST', 'PUT', 'PATCH', 'DELETE'].map(m => `<option ${draft.method === m ? 'selected' : ''}>${m}</option>`).join('')}</select>
-          <input class="mono" data-f="url" aria-label="Адрес" value="${esc(draft.url || '')}" spellcheck="false" placeholder="/v1/stations">
+          <input class="mono" data-f="url" aria-label="Адрес" value="${esc(draft.url || '')}" spellcheck="false" placeholder="/v1/zones">
           <button type="button" class="btn primary sm" data-send>Отправить</button></div>
         <div class="two"><div><div class="lbl">Заголовки (по одному на строку)</div><textarea data-f="headers" spellcheck="false" placeholder="Authorization: Bearer ${api.TOKEN}">${esc(draft.headers || '')}</textarea></div>
           <div><div class="lbl">Тело (JSON)</div><textarea data-f="body" spellcheck="false" placeholder="{ }">${esc(draft.body || '')}</textarea></div></div>`}
@@ -408,7 +408,7 @@
   const b64uStr = s => b64u(utf8(s));
   const unb64u = s => { s = String(s).replace(/-/g, '+').replace(/_/g, '/'); while (s.length % 4) s += '='; const bin = atob(s); try { return decodeURIComponent(Array.from(bin, c => '%' + c.charCodeAt(0).toString(16).padStart(2, '0')).join('')); } catch (e) { return bin; } };
   api.sha256 = sha256; api.hmac = hmac; api.b64u = b64u; api.b64uStr = b64uStr; api.unb64u = unb64u;
-  api.JWT_SECRET = 'iskra-demo-secret-2027';
+  api.JWT_SECRET = 'lozhka-demo-secret-2027';
   api.jwtSign = (header, payload, secret) => { const h = b64uStr(JSON.stringify(header)), p = b64uStr(JSON.stringify(payload)); return `${h}.${p}.${b64u(hmac(secret || api.JWT_SECRET, h + '.' + p))}`; };
   api.jwtDecode = tok => {
     const parts = String(tok || '').trim().split('.');

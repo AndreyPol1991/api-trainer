@@ -320,7 +320,7 @@
         ${cfg.q ? `<div class="q"><b>${cfg.q}</b></div>` : ''}
         <textarea id="${esc(cfg.id || 'just-' + TR.hash(cfg.q || ''))}" rows="5" placeholder="${esc(cfg.placeholder || 'Своими словами: что выбрали и почему.')}" ${cfg.readonly ? 'readonly' : ''}>${esc(v.text)}</textarea>
         <div class="row between"><span class="small dim">${len < minLen ? `Ещё хотя бы ${minLen - len} ${TR.plural(minLen - len, 'символ', 'символа', 'символов')}` : 'Можно отправлять на проверку'}</span>
-          <div class="row">${aiOn && !cfg.readonly ? `<button type="button" class="btn sm" data-j="ai" ${len < minLen ? 'disabled' : ''}>Проверить с Верой (Claude)</button>` : ''}
+          <div class="row">${aiOn && !cfg.readonly ? `<button type="button" class="btn sm" data-j="ai" ${len < minLen ? 'disabled' : ''}>Проверить с Ириной (Claude)</button>` : ''}
           ${!cfg.readonly ? `<button type="button" class="btn ghost sm" data-j="self" ${len < minLen ? 'disabled' : ''}>Сверить с эталоном самому</button>` : ''}</div></div>
         <div data-jout></div>
       </div>`;
@@ -331,7 +331,7 @@
       let h = '';
       if (v.ai) {
         const a = v.ai, k = a.score >= 75 ? 'ok' : a.score >= 50 ? 'warn' : 'bad';
-        h += `<div class="note ${k}"><div class="ttl">Вера · ${a.score} из 100</div><div>${esc(a.verdict || '')}</div>
+        h += `<div class="note ${k}"><div class="ttl">Ирина · ${a.score} из 100</div><div>${esc(a.verdict || '')}</div>
           ${a.good && a.good.length ? `<ul class="checks">${a.good.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
           ${a.missing && a.missing.length ? `<ul class="checks">${a.missing.map(x => `<li class="warn">${esc(x)}</li>`).join('')}</ul>` : ''}
           ${a.wrong && a.wrong.length ? `<ul class="checks">${a.wrong.map(x => `<li class="bad">${esc(x)}</li>`).join('')}</ul>` : ''}</div>`;
@@ -360,7 +360,7 @@
       const out = TR.$('[data-jout]', el);
       out.innerHTML = `<div class="note"><div class="ttl">Вера читает</div><div class="row"><span class="typing"><i></i><i></i><i></i></span><button class="btn xs" type="button" data-j="stop">Стоп</button></div></div>`;
       b.disabled = true;
-      const prompt = `Ты — Вера, ведущий системный аналитик и наставник на курсе системных аналитиков. Студент-новичок проходит тренажёр по профессии (основы разработки, требования, моделирование процессов и интерфейсов, данные и SQL) на кейсе сети автосервисов «Искра» и письменно обосновывает решение.
+      const prompt = `Ты — Ирина, ведущий системный аналитик и наставник на курсе системных аналитиков. Студент-новичок проходит тренажёр по API (HTTP, REST, OpenAPI, gRPC, вебхуки и брокеры, безопасность, проектирование API) на кейсе сервиса доставки еды «Ложка» и его партнёра — сети пиццерий «Тесто» и письменно обосновывает решение.
 Вопрос студенту: ${cfg.qPlain || String(cfg.q || '').replace(/<[^>]+>/g, '')}
 Критерии хорошего ответа:
 ${(cfg.rubric || []).map((r, i) => (i + 1) + '. ' + String(r).replace(/<[^>]+>/g, '')).join('\n')}

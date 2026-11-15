@@ -257,7 +257,7 @@
     const min = o.minLen || 200;
     return {
       id: o.id, title: o.title,
-      lead: brief({ situation: o.situation, todo: [`Ответьте своими словами, от ${min} символов.`, 'Проверьте ответ по рубрике (или попросите Веру).', 'Нажмите «Проверить». Засчитывается от 60 % по рубрике.'], look: o.look }),
+      lead: brief({ situation: o.situation, todo: [`Ответьте своими словами, от ${min} символов.`, 'Проверьте ответ по рубрике (или попросите Ирину).', 'Нажмите «Проверить». Засчитывается от 60 % по рубрике.'], look: o.look }),
       blank: () => ({ j: {} }),
       reference: () => ({ j: { text: o.ref, self: o.rubric.map(() => true) } }),
       render(el, ctx) {
@@ -268,7 +268,7 @@
       },
       check(ans) {
         const j = ui.justifyScore(ans && ans.j), notes = [];
-        if (!j) notes.push({ ok: false, html: `Ответ не написан или не оценён: от ${min} символов, затем проверка по рубрике или с Верой.` });
+        if (!j) notes.push({ ok: false, html: `Ответ не написан или не оценён: от ${min} символов, затем проверка по рубрике или с Ириной.` });
         else notes.push({ ok: j >= 0.6 ? true : 'warn', html: `Ответ: ${pct(j)} по рубрике.${j < 0.6 && o.hint ? ' ' + esc(o.hint) : ''}` });
         return { ok: j >= 0.6, score: j, notes, summary: `Ответ: ${pct(j)} по рубрике.`, mentor: j >= 0.6 ? null : o.mentor };
       },
